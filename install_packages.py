@@ -14,7 +14,8 @@ packages = [
     "clip-by-openai",
     "pymilvus",
     "pillow",
-    "pymilvus"
+    "pymilvus",
+    "python-dotenv"
 ]
 
 def install_packages():
