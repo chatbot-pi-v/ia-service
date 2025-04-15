@@ -12,7 +12,6 @@ def create_milvus_db():
     timeout=60
   )
 
-  # Definir os campos do schema
   fields = [
     FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
     FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768) #ajustar dimensao

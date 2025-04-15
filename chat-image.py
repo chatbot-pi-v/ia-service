@@ -3,16 +3,16 @@ import torch
 from langchain_milvus import Milvus
 from PIL import Image
 import os
+from config.settings import MILVUS_URI, MILVUS_TOKEN, MILVUS_DB_NAME, COLLECTION_NAME
 
 # Importa a função de inicialização
 from milvus_img import initialize_milvus_for_images  
 
-# Configuração de conexão com Milvus na nuvem
-URI = "https://seu-servidor-milvus.cloud"  # Substitua pelo seu endpoint
-TOKEN = "seu_token_de_acesso"  # Substitua pelo token da sua instância na nuvem
-COLLECTION_NAME = "ImageCollection"
+
+
 
 def query_image(question):
+    COLLECTION_NAME = "ImageCollection"
     """Busca a imagem mais relevante no Milvus a partir de uma descrição em texto."""
     
     # Carregar modelo CLIP
@@ -28,7 +28,7 @@ def query_image(question):
     # Conectar ao Milvus na nuvem
     vector_store = Milvus(
         embedding=None,
-        connection_args={"uri": URI, "token": TOKEN, "db_name": "db_images"},
+        connection_args={"uri": MILVUS_URI, "token": MILVUS_TOKEN, "db_name": MILVUS_DB_NAME},
         collection_name=COLLECTION_NAME,
     )
 
@@ -48,7 +48,7 @@ def query_image(question):
 
 # Inicializa Milvus e garante que a coleção está configurada
 print("Inicializando Milvus e carregando imagens na nuvem...")
-initialize_milvus_for_images(URI, TOKEN, COLLECTION_NAME)
+initialize_milvus_for_images(MILVUS_URI, MILVUS_TOKEN, COLLECTION_NAME)
 
 question = "Um cachorro brincando na praia"
 image_result = query_image(question)

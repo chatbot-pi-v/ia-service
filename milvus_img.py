@@ -6,18 +6,15 @@ import numpy as np
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection
 from sklearn.preprocessing import normalize
 from pymilvus import utility
+from config.settings import MILVUS_URI, MILVUS_TOKEN
 
-#conecta ao milvus
-connections.connect(host="localhost", port="19530")
-#lista de coleções existentes
+connections.connect(uri=MILVUS_URI, token=MILVUS_TOKEN)
+
 all_collections = utility.list_collections()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device)
 
-
-
-# criar coleção no milvus
 collection_name = 'image_embeddings'
 
 fields = [
@@ -28,16 +25,13 @@ fields = [
 
 schema = CollectionSchema(fields, description='Armazena embeddings de imagens')
 
-
-
-# Verifica se a coleção já existe
 collection_exists = collection_name in all_collections
 
 if not collection_exists:
     collection = Collection(name=collection_name, schema=schema)
     collection.create_index(field_name="embedding", index_params={"metric_type": "L2"})
 else:
-    collection = Collection(name=collection_name) #realiza a instancia
+    collection = Collection(name=collection_name)
 
 
 def extract_clip_embedding(image_path):
@@ -64,17 +58,14 @@ def insert_images_into_milvus(path):
     collection.insert(entities)
     collection.flush()
 
-# Função para buscar imagens no Milvus usando texto
 def search_image_by_text(query_text, top_k=1):
     collection.load()
-    # Converter texto para embedding
     text_input = clip.tokenize([query_text]).to(device)
     with torch.no_grad():
         text_embedding = model.encode_text(text_input).cpu().numpy()
 
     text_embedding = normalize(text_embedding.reshape(1, -1), norm="l2").flatten()
 
-    # Fazer busca no Milvus
     search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
     results = collection.search(
         data=[text_embedding],
@@ -89,13 +80,12 @@ def search_image_by_text(query_text, top_k=1):
         return best_match.entity.get("image_path"), best_match.distance
     return None, None
 
-# Testando a inserção e a busca
 image_folder = "./images"
 insert_images_into_milvus(image_folder)
 
 print(f"Número de imagens no Milvus: {collection.num_entities}")
 
-query_text = "vermelho"
+query_text = "pessoa"
 best_image_path, similarity = search_image_by_text(query_text)
 
 if best_image_path:

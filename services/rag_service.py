@@ -2,12 +2,19 @@ from milvus.milvus_init import initialize_milvus
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.llms import Ollama
+from langchain.chat_models import ChatOpenAI
+from config.settings import GROQ_API_TOKEN, GROQ_API
+import os
+
+
+os.environ["OPENAI_API_KEY"] = GROQ_API_TOKEN
+os.environ["OPENAI_API_BASE"] = GROQ_API
 
 vector_store = initialize_milvus()
-llm = Ollama(
-  model='mistral',
-  temperature=0
+
+llm = ChatOpenAI(
+  model="llama3-70b-8192",  # testar "llama3-8b-8192"
+  temperature=0,
 )
 
 def get_contexts(pergunta, max_docs=3):
@@ -23,26 +30,29 @@ def get_contexts(pergunta, max_docs=3):
   return relevant_documents
 
 def process_question(question):
-  resposta = ''
   documents = get_contexts(question)
+  resposta = ''
 
   if len(documents) == 0:
-    resposta = "Parece que essa pergunta está fora do meu tema principal, que é amamentação. Se precisar de informações ou apoio sobre amamentação, estou aqui para ajudar no que for possível!"
+    return "Nenhuma resposta encontrada com base no contexto"
 
   prompt = PromptTemplate(
-    input_variables=["context","question"],
+    input_variables=["context", "question"],
     template="""
     # INSTRUÇÃO
-    Você é um especialista em religiões de matriz africana e afro-brasileira, e deve responder perguntas sobre o contexto histórico de forma clara e detalhada. Para cada pergunta, siga a seguinte sequência de pensamento para organizar sua resposta:
-    1. Explique brevemente o conceito ou termo relacionado à pergunta.
-    2. Se houver mais de uma opção, explique cada uma.
-    3. Se possível, forneça exemplos práticos ou dicas que ajudem a esclarecer a questão.
+    Você é uma pessoa que entende muito sobre religiões de matriz africana e afro-brasileira. Sua missão é ajudar outras pessoas a entenderem esses assuntos de forma simples, leve e direta — como se estivesse trocando uma ideia.
 
-    # CONTEXTO PARA RESPOSTAS
+    Sempre que responder:
+    1. Evite termos muito técnicos ou linguagem difícil.
+    2. Use um tom amigável, como se estivesse explicando pra um amigo ou colega.
+    3. Pode usar exemplos ou comparações, se achar que ajuda.
+    4. Seja claro e direto, mas mantenha o respeito e profundidade no conteúdo.
+
+    # CONTEXTO
     {context}
 
     # PERGUNTA
-    Pergunta: {question}
+    {question}
     """
   )
 
@@ -54,8 +64,5 @@ def process_question(question):
   )
 
   resposta = rag_chain.invoke({"context": documents, "question": question})
-
-  max_documents = 3  
-  resposta = "\n\n".join(doc[0] for doc in documents[:max_documents])
 
   return resposta
