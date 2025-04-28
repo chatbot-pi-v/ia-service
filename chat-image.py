@@ -1,19 +1,10 @@
 from transformers import CLIPProcessor, CLIPModel
 import torch
 from langchain_milvus import Milvus
-from PIL import Image
-import os
-from config.settings import MILVUS_URI, MILVUS_TOKEN, MILVUS_DB_NAME, COLLECTION_NAME
-
-# Importa a função de inicialização
-from milvus_img import initialize_milvus_for_images  
-
-
-
+from config.settings import MILVUS_URI, MILVUS_TOKEN, MILVUS_DB_NAME
 
 def query_image(question):
     COLLECTION_NAME = "ImageCollection"
-    """Busca a imagem mais relevante no Milvus a partir de uma descrição em texto."""
     
     # Carregar modelo CLIP
     model_name = "openai/clip-vit-base-patch32"
@@ -44,14 +35,3 @@ def query_image(question):
     else:
         print("Nenhuma imagem correspondente encontrada.")
         return None
-
-
-# Inicializa Milvus e garante que a coleção está configurada
-print("Inicializando Milvus e carregando imagens na nuvem...")
-initialize_milvus_for_images(MILVUS_URI, MILVUS_TOKEN, COLLECTION_NAME)
-
-question = "Um cachorro brincando na praia"
-image_result = query_image(question)
-
-if image_result:
-    print(f"Imagem correspondente: {image_result}")  # Pode ser usada para exibir ou servir via API
