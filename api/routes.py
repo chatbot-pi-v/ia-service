@@ -3,9 +3,8 @@ from services.rag_service import process_question
 
 api = Blueprint('api', __name__)
 
-@api.route('/ask', methods=['POST'])
+@api.route('/question', methods=['POST'])
 def answer_question():
-    
   data = request.get_json()
   question = data.get('question', '')
 

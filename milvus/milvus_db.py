@@ -14,7 +14,7 @@ def create_milvus_db():
 
   fields = [
     FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-    FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768) #ajustar dimensao
+    FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768)
   ]
 
   schema = CollectionSchema(fields, description="Coleção de embeddings")
@@ -22,14 +22,12 @@ def create_milvus_db():
   if COLLECTION_NAME not in list_collections():
     collection = Collection(name=COLLECTION_NAME, schema=schema)
     collection.create_index(field_name="embedding", index_params={
-      "index_type": "IVF_FLAT", 
-      "metric_type": "L2"
+      "index_type": "IVF_FLAT", #indexação dos vetores em clusters
+      "metric_type": "IP" #similaridade de direção (produto interno)
     })
     collection.load()
-    print(f"Coleção '{COLLECTION_NAME}' criada e carregada com sucesso.")
   else:
     collection = Collection(name=COLLECTION_NAME)
     collection.load()
-    print(f"Coleção '{COLLECTION_NAME}' já existe e foi carregada.")
 
   return collection

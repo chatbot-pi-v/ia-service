@@ -49,7 +49,11 @@ class SafeRAGPipeline:
 
   def get_contexts(self, question, max_docs=3):
     results = self.vector_store.similarity_search_with_score(question, k=max_docs)
-    return [doc.page_content for doc, score in results if score < 1]
+    content = []
+    for doc, score in results:
+      if score < 1:
+        content.append(doc.page_content)
+    return content
 
   def process(self, question):
     documents = self.get_contexts(question)
