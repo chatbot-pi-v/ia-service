@@ -16,7 +16,6 @@ def initialize_milvus():
     connection_args={"uri": MILVUS_URI, "token": MILVUS_TOKEN, "db_name": MILVUS_DB_NAME},
     collection_name=COLLECTION_NAME,
     index_params={"index_type": "FLAT", "metric_type": "IP"},
-    consistency_level="Strong", 
     drop_old=True
   )
 
