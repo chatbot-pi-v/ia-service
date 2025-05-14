@@ -32,7 +32,7 @@ collection_exists = collection_name in all_collections
 
 if not collection_exists:
     collection = Collection(name=collection_name, schema=schema)
-    collection.create_index(field_name="embedding", index_params={"metric_type": "L2"})
+    collection.create_index(field_name="embedding", index_params={"metric_type": "IP"})
 else:
     collection = Collection(name=collection_name)
 
