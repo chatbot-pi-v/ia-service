@@ -2,7 +2,7 @@ import os
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-def load_pdfs(data_path="./data"):
+def load_pdfs(data_path="./docs/pdf"):
   documents = []
   text_splitter = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=150)
 

@@ -12,5 +12,10 @@ def answer_question():
     return jsonify({"error": "Pergunta vazia"}), 400
 
   response = process_question(question)
-
-  return jsonify({"answer": response})
+  
+  print(f'response = {response}')
+  return jsonify({
+    "answer": response["text"],
+    "image_base64": response["image_base64"],
+    "image_caption": response["image_caption"]
+  })
