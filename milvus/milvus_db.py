@@ -14,14 +14,14 @@ def create_milvus_db():
 
   fields = [
     FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-    FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768)
+    FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=768)
   ]
 
   schema = CollectionSchema(fields, description="Coleção de embeddings")
 
   if COLLECTION_NAME not in list_collections():
     collection = Collection(name=COLLECTION_NAME, schema=schema)
-    collection.create_index(field_name="embedding", index_params={
+    collection.create_index(field_name="vector", index_params={
       "index_type": "IVF_FLAT", #indexação dos vetores em clusters
       "metric_type": "IP" #similaridade de direção (produto interno)
     })
