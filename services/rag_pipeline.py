@@ -42,6 +42,7 @@ class SafeRAGPipeline:
       - Contexto histórico da diáspora africana
 
       # TOM E ESTILO DE COMUNICAÇÃO
+      - Evite se apresentar mais de uma vez
       - Use linguagem acolhedora, simples e didática
       - Comunique-se como quem conversa com um amigo curioso
       - Inclua expressões carinhosas ocasionais como "meu bem", "meu filho/minha filha" ou "querido/querida"
@@ -96,19 +97,25 @@ class SafeRAGPipeline:
         content.append(doc.page_content)
     return content
 
+
   def image_to_base64(self, image_path):
     try:
-      normalized_path = os.path.normpath(image_path)
-      
-      if not os.path.exists(normalized_path):
-        print(f"Aviso: Imagem não encontrada em: {normalized_path}")
-        return None
-        
-      with open(normalized_path, "rb") as img_file:
-        return base64.b64encode(img_file.read()).decode('utf-8')
+        normalized_path = os.path.normpath(image_path)
+        absolute_path = os.path.abspath(normalized_path)
+        print(f"Local completo da imagem: {absolute_path}")
+
+        if not os.path.exists(absolute_path):
+            print(f"Aviso: Imagem não encontrada em: {absolute_path}")
+            return None
+
+        with open(absolute_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode('utf-8')
+
     except Exception as e:
-      print(f"Erro ao converter imagem para base64: {e}")
-      return None
+        print(f"Erro ao converter imagem para base64: {e}")
+        return None
+
+
 
   def process(self, question):
     documents = self.get_contexts(question)
@@ -120,25 +127,30 @@ class SafeRAGPipeline:
     }
 
     if documents:
-      context = "\n\n".join(documents)
-      
-      image_path, image_caption, _ = self.image_search_fn(question)
-      print("Legenda encontrada:", image_caption)
-      print("Caminho da imagem:", image_path)
+        context = "\n\n".join(documents)
 
-      if image_caption:
-        context += f"\n\nLegenda de imagem relacionada: {image_caption}"
-      
-      text_response = self.chain.invoke({"context": context, "question": question})
-      
-      image_base64 = None
-      if image_path:
-        image_base64 = self.image_to_base64(image_path)
-      
-      response = {
-        "text": text_response,
-        "image_base64": image_base64,
-        "image_caption": image_caption
-      }
-    
+        # Busca imagem relacionada à pergunta
+        image_path, image_caption, distance = self.image_search_fn(question)
+        print("Legenda encontrada:", image_caption)
+        print("Caminho da imagem:", image_path)
+        print("Distância da imagem:", distance)
+
+        # Só incluir imagem se a distância for considerada relevante
+        image_base64 = None
+        if distance is not None and distance <= 0.8:
+            if image_caption:
+                context += f"\n\nLegenda de imagem relacionada: {image_caption}"
+            
+            if image_path:
+                corrected_path = os.path.join("docs/images", os.path.basename(image_path))
+                image_base64 = self.image_to_base64(corrected_path)
+
+        text_response = self.chain.invoke({"context": context, "question": question})
+
+        response = {
+            "text": text_response,
+            "image_base64": image_base64,
+            "image_caption": image_caption if image_base64 else None
+        }
+
     return response
