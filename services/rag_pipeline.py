@@ -127,30 +127,32 @@ class SafeRAGPipeline:
     }
 
     if documents:
-        context = "\n\n".join(documents)
+      context = "\n\n".join(documents)
 
-        # Busca imagem relacionada à pergunta
-        image_path, image_caption, distance = self.image_search_fn(question)
-        print("Legenda encontrada:", image_caption)
-        print("Caminho da imagem:", image_path)
-        print("Distância da imagem:", distance)
+      # Busca imagem relacionada à pergunta
+      image_path, image_caption, distance = self.image_search_fn(question)
+      print("Legenda encontrada:", image_caption)
+      print("Caminho da imagem:", image_path)
+      print("Distância da imagem:", distance)
 
-        # Só incluir imagem se a distância for considerada relevante
-        image_base64 = None
-        if distance is not None and distance <= 0.8:
-            if image_caption:
-                context += f"\n\nLegenda de imagem relacionada: {image_caption}"
-            
-            if image_path:
-                corrected_path = os.path.join("docs/images", os.path.basename(image_path))
-                image_base64 = self.image_to_base64(corrected_path)
+      # Só incluir imagem se a distância for considerada relevante
+      image_base64 = None
+      IMAGE_DISTANCE_THRESHOLD = 0.3
 
-        text_response = self.chain.invoke({"context": context, "question": question})
+      if distance is not None and distance <= IMAGE_DISTANCE_THRESHOLD:
+        if image_caption:
+          context += f"\n\nLegenda de imagem relacionada: {image_caption}"
+          
+        if image_path:
+          corrected_path = os.path.join("docs/images", os.path.basename(image_path))
+          image_base64 = self.image_to_base64(corrected_path)
 
-        response = {
-            "text": text_response,
-            "image_base64": image_base64,
-            "image_caption": image_caption if image_base64 else None
-        }
+      text_response = self.chain.invoke({"context": context, "question": question})
+
+      response = {
+          "text": text_response,
+          "image_base64": image_base64,
+          "image_caption": image_caption if image_base64 else None
+      }
 
     return response
