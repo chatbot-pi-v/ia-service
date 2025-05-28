@@ -4,7 +4,8 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain.chat_models import ChatOpenAI
-import requests
+import math
+import re
 
 class SafeRAGPipeline:
   def __init__(self, vector_store, image_search_fn, groq_api_url, groq_token, model="llama3-8b-8192"):
@@ -42,10 +43,10 @@ class SafeRAGPipeline:
       - Contexto histórico da diáspora africana
 
       # TOM E ESTILO DE COMUNICAÇÃO
-      - Evite se apresentar mais de uma vez
+      - Evite se apresentar (não diga "sou a Nanã" ou "eu sou uma IA")
       - Use linguagem acolhedora, simples e didática
       - Comunique-se como quem conversa com um amigo curioso
-      - Inclua expressões carinhosas ocasionais como "meu bem", "meu filho/minha filha" ou "querido/querida"
+      - Use expressões carinhosas com moderação: no máximo uma vez por resposta, e evite repetir em perguntas próximas
       - Evite jargões religiosos complexos sem explicação
       - Use analogias do cotidiano para explicar conceitos mais profundos
       - Mantenha um tom alegre e otimista, mas sério quando necessário
@@ -89,12 +90,30 @@ class SafeRAGPipeline:
       | StrOutputParser()
     )
 
-  def get_contexts(self, question, max_docs=3):
+
+
+  def score_to_weight(self, score, max_score=1.0):
+    # Quanto menor o score, mais similar (ex: score = 0.1 → peso = 0.9)
+    weight = max(0.1, 1 - (score / max_score))  # Garante mínimo de 0.1
+    return weight
+
+  def crop_context(self, text, weight, max_len=500):
+    # Corta o contexto com base no peso e no tamanho máximo permitido
+    sentences = text.split(". ")
+    num_sentences = max(1, math.ceil(len(sentences) * weight))
+    cropped = ". ".join(sentences[:num_sentences])
+    return cropped
+
+  def get_contexts(self, question, max_docs=3, max_len=500):
     results = self.vector_store.similarity_search_with_score(question, k=max_docs)
     content = []
+
     for doc, score in results:
-      if score < 1:
-        content.append(doc.page_content)
+      if score < 1.0:
+        weight = self.score_to_weight(score)  # Ex: 0.2 → peso alto
+        cropped = self.crop_context(doc.page_content, weight, max_len)
+        content.append(cropped)
+
     return content
 
 
@@ -115,7 +134,9 @@ class SafeRAGPipeline:
         print(f"Erro ao converter imagem para base64: {e}")
         return None
 
-
+  def extract_keywords(self, text):
+    # Extrai palavras significativas com pelo menos 3 letras
+    return set(re.findall(r'\b\w{3,}\b', text.lower()))
 
   def process(self, question):
     documents = self.get_contexts(question)
@@ -135,11 +156,14 @@ class SafeRAGPipeline:
       print("Caminho da imagem:", image_path)
       print("Distância da imagem:", distance)
 
-      # Só incluir imagem se a distância for considerada relevante
       image_base64 = None
-      IMAGE_DISTANCE_THRESHOLD = 0.3
 
-      if distance is not None and distance <= IMAGE_DISTANCE_THRESHOLD:
+      # Checar se legenda da imagem contém alguma palavra-chave da pergunta
+      keywords = self.extract_keywords(question)
+      caption_words = self.extract_keywords(image_caption or "")
+      has_common_word = bool(keywords & caption_words)
+
+      if distance is not None and has_common_word:
         if image_caption:
           context += f"\n\nLegenda de imagem relacionada: {image_caption}"
           
@@ -147,6 +171,12 @@ class SafeRAGPipeline:
           corrected_path = os.path.join("docs/images", os.path.basename(image_path))
           image_base64 = self.image_to_base64(corrected_path)
 
+      else:
+        if not has_common_word:
+            print("⚠️ Nenhuma palavra da pergunta encontrada na legenda. Ignorando imagem.")
+        elif distance is not None:
+            print(f"⚠️ Similaridade baixa ({distance}). Ignorando imagem.")
+        
       text_response = self.chain.invoke({"context": context, "question": question})
 
       response = {
