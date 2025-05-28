@@ -13,7 +13,7 @@ def answer_question():
 
   response = process_question(question)
   
-  print(f'response = {response}')
+  # print(f'response = {response}')
   return jsonify({
     "answer": response["text"],
     "image_base64": response["image_base64"],
