@@ -46,27 +46,24 @@ def extract_clip_embedding(image_path):
 
     return normalize(embedding.reshape(1, -1), norm="l2").flatten()
 
-def insert_images_into_milvus(path, captions_map):
-    image_paths = [
-        os.path.join(path, filename)
-        for filename in os.listdir(path)
-        if filename.endswith((".png", ".jpg", ".jpeg"))
-    ]
+def insert_images_into_milvus(image_filename, caption):
+    path = "./docs/images"
+    image_path = os.path.join(path, image_filename)
 
-    entities = []
-    for image_path in image_paths:
-        filename = os.path.basename(image_path)
-        caption = captions_map.get(filename, "")  # Pega a legenda associada ou string vazia
-        vector = extract_clip_embedding(image_path)
-        
-        entities.append({
-            "image_path": image_path,
-            "vector": vector,
-            "captions": caption
-        })
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"Imagem não encontrada: {image_path}")
 
-    collection.insert(entities)
+    vector = extract_clip_embedding(image_path)
+
+    entity = {
+        "image_path": image_path,
+        "vector": vector,
+        "captions": caption
+    }
+
+    collection.insert([entity])
     collection.flush()
+
 
 def search_image_by_text(query_text, top_k=3):
     collection.load()
