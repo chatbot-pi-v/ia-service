@@ -1,5 +1,6 @@
 import os
 import base64
+from pathlib import Path
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
@@ -136,16 +137,31 @@ class SafeRAGPipeline:
 
 
   def image_to_base64(self, image_path):
+    print(f"image_path: {image_path}")
     try:
         normalized_path = os.path.normpath(image_path)
+        print(f"normalized_path: {normalized_path}")
+        # Corrige as barras
+        clean_path = normalized_path.replace("\\", "/")
+        
+        # Se detecta duplicação 'images/images', corrige
+        parts = clean_path.split('/')
+        fixed_parts = []
+        for i, part in enumerate(parts):
+            if i == 0 or part != parts[i-1]:
+                fixed_parts.append(part)
+
+        fixed_path = Path(*fixed_parts).resolve()
+        print(f"fixed_path: {fixed_path}")
+        
         absolute_path = os.path.abspath(normalized_path)
         print(f"Local completo da imagem: {absolute_path}")
 
-        if not os.path.exists(absolute_path):
-            print(f"Aviso: Imagem não encontrada em: {absolute_path}")
+        if not os.path.exists(fixed_path):
+            print(f"Aviso: Imagem não encontrada em: {fixed_path}")
             return None
 
-        with open(absolute_path, "rb") as img_file:
+        with open(fixed_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode('utf-8')
 
     except Exception as e:
