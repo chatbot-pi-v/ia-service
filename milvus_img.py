@@ -22,7 +22,7 @@ collection_name = 'image_embeddings'
 fields = [
     FieldSchema(name='id', dtype=DataType.INT64, is_primary=True, auto_id=True),
     FieldSchema(name='image_path', dtype=DataType.VARCHAR, max_length=512),
-    FieldSchema(name='embedding', dtype=DataType.FLOAT_VECTOR, dim=512),
+    FieldSchema(name='vector', dtype=DataType.FLOAT_VECTOR, dim=512),
     FieldSchema(name='captions', dtype=DataType.VARCHAR, max_length=1024)
 ]
 
@@ -46,45 +46,65 @@ def extract_clip_embedding(image_path):
 
     return normalize(embedding.reshape(1, -1), norm="l2").flatten()
 
-def insert_images_into_milvus(path):
+def insert_images_into_milvus(path, captions_map):
     image_paths = [
         os.path.join(path, filename)
         for filename in os.listdir(path)
         if filename.endswith((".png", ".jpg", ".jpeg"))
     ]
 
-    entities = [
-        {"image_path": p, "embedding": extract_clip_embedding(p)}
-        for p in image_paths
-    ]
+    entities = []
+    for image_path in image_paths:
+        filename = os.path.basename(image_path)
+        caption = captions_map.get(filename, "")  # Pega a legenda associada ou string vazia
+        vector = extract_clip_embedding(image_path)
+        
+        entities.append({
+            "image_path": image_path,
+            "vector": vector,
+            "captions": caption
+        })
 
     collection.insert(entities)
     collection.flush()
 
-def search_image_by_text(query_text, top_k=1):
+def search_image_by_text(query_text, top_k=3):
     collection.load()
+
     text_input = clip.tokenize([query_text]).to(device)
     with torch.no_grad():
-        text_embedding = model.encode_text(text_input).cpu().numpy() #transformando textos em valores menores convertidos em numpy
+        text_embedding = model.encode_text(text_input).cpu().numpy()
 
     text_embedding = normalize(text_embedding.reshape(1, -1), norm="l2").flatten()
 
-    search_params = {"metric_type": "IP", "params": {"nprobe": 10}}
+    search_params = {"metric_type": "IP"}
     results = collection.search(
         data=[text_embedding],
-        anns_field="embedding",
+        anns_field="vector",
         param=search_params,
         limit=top_k,
         output_fields=["image_path", "captions"],
     )
 
     if results and results[0]:
-        best_match = results[0][0] #pega o primeiro resultado (mais proximo)
-        return (
-            best_match.entity.get("image_path"),
-            best_match.entity.get("captions"),
-            best_match.distance, #distancia vetorial mais perto de 0
-        )
+        keywords = set(query_text.lower().split())  # ou use self.extract_keywords()
+
+        print("\n🎯 Resultados mais próximos:")
+        for hit in results[0]:
+            caption = (hit.entity.get("captions") or "").lower()
+            caption_words = set(caption.split())
+            distance = hit.distance
+
+            print(f"- Legenda: {caption} | Distância: {distance:.4f}")
+
+            if keywords & caption_words and distance < 0.3:
+                return (
+                    hit.entity.get("image_path"),
+                    hit.entity.get("captions"),
+                    hit.distance,
+                )
+
+    # Se não houver nenhuma imagem boa o suficiente
     return None, None, None
 
 

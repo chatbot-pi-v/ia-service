@@ -10,7 +10,8 @@ rag_pipeline = SafeRAGPipeline(
     image_search_fn=get_best_image_caption_by_text,
     groq_api_url=GROQ_API,
     groq_token=GROQ_API_TOKEN,
-    model="llama3-8b-8192"
+    model="llama3-8b-8192",
+    embedding_model="BAAI/bge-base-en-v1.5"
 )
 
 def process_question(question):

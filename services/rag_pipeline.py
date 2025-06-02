@@ -6,12 +6,32 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain.chat_models import ChatOpenAI
 import math
 import re
+from sentence_transformers import SentenceTransformer, util
 
 class SafeRAGPipeline:
-  def __init__(self, vector_store, image_search_fn, groq_api_url, groq_token, model="llama3-8b-8192"):
+  def __init__(self, vector_store, image_search_fn, groq_api_url, groq_token, model="llama3-8b-8192", embedding_model="BAAI/bge-base-en-v1.5"):
     self.vector_store = vector_store
     self.image_search_fn = image_search_fn
     self.model = model
+    self.embedding_model = SentenceTransformer(embedding_model)
+
+    self.domain_examples = [
+      "O que é um Orixá?",
+      "Como funciona uma gira na Umbanda?",
+      "Qual a origem do Candomblé?",
+      "O que significa Exu nas religiões afro?",
+      "Para que servem as ervas sagradas no Candomblé?",
+      "Quais são os fundamentos do Batuque?",
+      "O que é sincretismo religioso?",
+      "Quem é Iemanjá?",
+      "Como são feitos os rituais de iniciação?",
+      "Qual o papel das mulheres nas religiões afro-brasileiras?"
+    ]
+
+    self.domain_embeddings = self.embedding_model.encode(
+      self.domain_examples,
+      convert_to_tensor=True
+    )
 
     os.environ["OPENAI_API_KEY"] = groq_token
     os.environ["OPENAI_API_BASE"] = groq_api_url
@@ -90,8 +110,6 @@ class SafeRAGPipeline:
       | StrOutputParser()
     )
 
-
-
   def score_to_weight(self, score, max_score=1.0):
     # Quanto menor o score, mais similar (ex: score = 0.1 → peso = 0.9)
     weight = max(0.1, 1 - (score / max_score))  # Garante mínimo de 0.1
@@ -134,55 +152,52 @@ class SafeRAGPipeline:
         print(f"Erro ao converter imagem para base64: {e}")
         return None
 
+
   def extract_keywords(self, text):
     # Extrai palavras significativas com pelo menos 3 letras
-    return set(re.findall(r'\b\w{3,}\b', text.lower()))
+    return set(re.findall(r'\b\w{4,}\b', text.lower()))
+
+
+  def is_question_relevant(self, question, threshold=0.74):
+    question_embedding = self.embedding_model.encode(question, convert_to_tensor=True)
+    cos_similarities = util.cos_sim(question_embedding, self.domain_embeddings)
+    max_score = cos_similarities.max().item()
+    print(f"[RELEVÂNCIA] Score da pergunta: {max_score:.3f}")
+    return max_score >= threshold
+
 
   def process(self, question):
+    if not self.is_question_relevant(question):
+      return {
+          "text": (
+              "Olá! Essa pergunta não parece relacionada às religiões afro-brasileiras "
+              "ou tradições africanas. Posso te ajudar com temas como Candomblé, Umbanda, "
+              "Orixás, sincretismo religioso, ervas sagradas e história da ancestralidade africana."
+          ),
+          "image_base64": None,
+          "image_caption": None
+      }
+    
     documents = self.get_contexts(question)
     
-    response = {
-      "text": "Nenhuma resposta encontrada com base no contexto textual.",
-      "image_base64": None,
-      "image_caption": None
-    }
-
     if documents:
-      context = "\n\n".join(documents)
+        context = "\n\n".join(documents)
 
-      # Busca imagem relacionada à pergunta
-      image_path, image_caption, distance = self.image_search_fn(question)
-      print("Legenda encontrada:", image_caption)
-      print("Caminho da imagem:", image_path)
-      print("Distância da imagem:", distance)
+        image_path, image_caption, distance = self.image_search_fn(question)
 
-      image_base64 = None
+        image_base64 = None
+        if image_caption and image_path:
+            context += f"\n\nLegenda de imagem relacionada: {image_caption}"
+            corrected_path = os.path.join("docs/images", os.path.basename(image_path))
+            image_base64 = self.image_to_base64(corrected_path)
+        else:
+            print("⚠️ Nenhuma imagem relevante encontrada.")
 
-      # Checar se legenda da imagem contém alguma palavra-chave da pergunta
-      keywords = self.extract_keywords(question)
-      caption_words = self.extract_keywords(image_caption or "")
-      has_common_word = bool(keywords & caption_words)
-
-      if distance is not None and has_common_word:
-        if image_caption:
-          context += f"\n\nLegenda de imagem relacionada: {image_caption}"
-          
-        if image_path:
-          corrected_path = os.path.join("docs/images", os.path.basename(image_path))
-          image_base64 = self.image_to_base64(corrected_path)
-
-      else:
-        if not has_common_word:
-            print("⚠️ Nenhuma palavra da pergunta encontrada na legenda. Ignorando imagem.")
-        elif distance is not None:
-            print(f"⚠️ Similaridade baixa ({distance}). Ignorando imagem.")
-        
-      text_response = self.chain.invoke({"context": context, "question": question})
-
-      response = {
-          "text": text_response,
-          "image_base64": image_base64,
-          "image_caption": image_caption if image_base64 else None
-      }
+        text_response = self.chain.invoke({"context": context, "question": question})
+        response = {
+            "text": text_response,
+            "image_base64": image_base64,
+            "image_caption": image_caption if image_base64 else None
+        }
 
     return response
