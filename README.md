@@ -25,6 +25,11 @@
   - `python install_packages.py`
 
 # 6. Após todas as bibliotecas instaladas, basta digitar e rodar o seguinte comando no terminal na pasta do projeto
-  - `python app.py`
+  - `python main.py`
     Esse comando irá iniciar o servidor python na porta 5050
+
+# 7. Requisitos para rodar localmente:
+- Uma máquina que suporta o Ollama para rodar de forma dedicada o modelo Llama3
+- Python ^3.12
+- Milvus
 
